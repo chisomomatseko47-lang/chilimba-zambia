@@ -1,9 +1,9 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
 
-const groups = [
-  { name: 'My Chilimba', contribution: 'K500', members: '12 members', next: '15 Oct', status: '11/12 paid' },
-];
-
-export default function DashboardPage() {
-  return <main className="shell"><nav className="topbar"><strong>Chilimba Zambia</strong><Link href="/groups/new" className="btn">+ Create group</Link></nav><section><span className="eyebrow">Member dashboard</span><h1>Your savings groups</h1><p className="muted">Track contributions, payouts and group activity.</p></section><section className="grid">{groups.map(g=><div className="card" key={g.name}><div className="row"><h2>{g.name}</h2><span className="pill">Active</span></div><p>{g.contribution} monthly · {g.members}</p><hr/><div className="row"><span>Next payout</span><strong>{g.next}</strong></div><div className="row"><span>Contributions</span><strong>{g.status}</strong></div><Link className="btn secondary full" href="/groups/demo">Open group</Link></div>)}<div className="card"><h2>Need a group?</h2><p>Create a chilimba and invite your friends, family or workmates.</p><Link className="btn full" href="/groups/new">Create Chilimba</Link></div></section></main>;
-}
+export default function DashboardPage(){const supabase=createClient();const [groups,setGroups]=useState<any[]>([]);const [loading,setLoading]=useState(true);
+useEffect(()=>{(async()=>{const {data:{user}}=await supabase.auth.getUser();if(user){const {data}=await supabase.from('group_members').select('group_id,role,payout_position,chilimba_groups(id,name,contribution_amount,frequency,start_date)').eq('user_id',user.id).eq('status','active');setGroups(data||[])}setLoading(false)})()},[]);
+return <main className="shell"><header className="topbar"><strong>Chilimba Zambia</strong><span>🇿🇲</span></header><section className="hero"><p className="eyebrow">MY CHILIMBAS</p><h1>Save together.<br/>Know everything.</h1><p>Transparent savings groups, contribution tracking and payout schedules.</p><Link className="btn" href="/groups/new">+ Create chilimba</Link></section>{loading?<section className="card"><p>Loading your groups…</p></section>:groups.length===0?<section className="card"><h2>No chilimbas yet</h2><p className="muted">Create your first group or join one with an invitation.</p><Link href="/groups/new">Create a chilimba →</Link></section>:<section className="card"><h2>Your groups</h2>{groups.map(x=>{const g=x.chilimba_groups;return <Link className="member" href={`/groups/${g.id}`} key={g.id}><span className="avatar">{g.name[0]}</span><div><strong>{g.name}</strong><small>K{Number(g.contribution_amount).toLocaleString()} · {g.frequency} · Position #{x.payout_position||'—'}</small></div><span>→</span></Link>})}</section>}<section className="card"><h2>What’s next</h2><p className="muted">Your contribution and payout records will appear here as your groups run their cycles.</p></section><footer>Built for Zambian savings groups · ZMW</footer></main>}
