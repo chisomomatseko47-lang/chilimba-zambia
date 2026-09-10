@@ -1,0 +1,12 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
+import { Brand } from '@/components/brand';
+
+export default function GroupsPage(){
+ const supabase=createClient(); const [groups,setGroups]=useState<any[]>([]); const [loading,setLoading]=useState(true);
+ useEffect(()=>{(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user){window.location.href='/login';return}const {data}=await supabase.from('group_members').select('group_id,role,payout_position,status,chilimba_groups(id,name,contribution_amount,frequency,start_date,status)').eq('user_id',user.id).eq('status','active');setGroups(data||[]);setLoading(false)})()},[supabase]);
+ return <main className="shell"><header className="topbar"><Link href="/dashboard"><Brand compact/></Link><nav><Link href="/dashboard">Home</Link><Link href="/profile">Profile</Link></nav></header><section className="hero"><p className="eyebrow">YOUR SAVINGS CIRCLES</p><h1>Chilimbas<br/>that move together.</h1><p>See every group, contribution commitment and payout position in one trusted place.</p><div style={{marginTop:22}}><Link className="btn" href="/groups/new">+ Create a chilimba</Link></div></section>{loading?<section className="card"><p>Loading your groups…</p></section>:groups.length===0?<section className="card"><p className="eyebrow">GET STARTED</p><h2>Your first chilimba</h2><p className="muted">Create a savings circle or join one through an invitation.</p><Link className="btn" href="/groups/new">Start saving</Link></section>:<section className="dashboard-grid">{groups.map(x=>{const g=x.chilimba_groups;return <Link className="card" href={`/groups/${g.id}`} key={x.group_id} style={{display:'block'}}><div className="section-head"><span className="avatar">{g?.name?.[0]||'C'}</span><span className="pill">{x.role}</span></div><p className="eyebrow">ACTIVE CHILIMBA</p><h2>{g?.name}</h2><p className="muted">K{Number(g?.contribution_amount||0).toLocaleString()} · {g?.frequency||'cycle'}</p><div className="member"><div><strong>Payout position</strong><small>Member #{x.payout_position||'—'}</small></div><span className="positive">→</span></div></Link>})}</section>}<nav className="mobile-nav"><Link href="/dashboard">⌂<span>Home</span></Link><Link className="active" href="/groups">♧<span>Groups</span></Link><Link href="/member">₭<span>Pay</span></Link><Link href="/transactions">◷<span>History</span></Link><Link href="/profile">♙<span>Profile</span></Link></nav></main>
+}
