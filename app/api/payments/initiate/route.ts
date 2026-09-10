@@ -8,7 +8,8 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const body = await request.json();
-    const provider = (body.provider || 'sandbox') as PaymentProvider;
+    const provider = (body.provider || process.env.PAYMENT_PROVIDER || 'sandbox') as PaymentProvider;
+    if (provider !== 'sandbox' && provider !== 'moneyunify') return NextResponse.json({ error: 'Unsupported payment provider.' }, { status: 400 });
     const phone = normalizeZambianPhone(String(body.phone || user.phone || ''));
     const { data: contribution } = await supabase.from('contributions').select('id,group_id,member_id,amount,status').eq('id', body.contribution_id).single();
     if (!contribution || contribution.status !== 'pending') return NextResponse.json({ error: 'Contribution is not payable.' }, { status: 400 });
