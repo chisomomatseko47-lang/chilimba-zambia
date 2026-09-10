@@ -1,4 +1,6 @@
-export type PaymentProvider = 'mtn' | 'airtel' | 'zamtel' | 'sandbox';
+import MoneyUnify from 'money-unify-js';
+
+export type PaymentProvider = 'moneyunify' | 'sandbox';
 export type PaymentStatus = 'pending' | 'successful' | 'failed' | 'reversed';
 
 export type PaymentRequest = {
@@ -13,6 +15,7 @@ export type PaymentRequest = {
 
 export interface PaymentAdapter {
   initiate(request: PaymentRequest): Promise<{ reference: string; status: PaymentStatus }>;
+  verify?(reference: string): Promise<{ status: PaymentStatus; reference: string }>;
 }
 
 export function normalizeZambianPhone(phone: string) {
@@ -23,13 +26,41 @@ export function normalizeZambianPhone(phone: string) {
   throw new Error('Enter a valid Zambian mobile number.');
 }
 
+function extractReference(response: any) {
+  return String(response?.data?.reference || response?.data?.transaction_id || response?.reference || response?.transaction_id || '');
+}
+
+function extractStatus(response: any): PaymentStatus {
+  const status = String(response?.data?.status || response?.status || '').toLowerCase();
+  if (status === 'successful' || status === 'success') return 'successful';
+  if (status === 'failed' || status === 'declined') return 'failed';
+  if (status === 'reversed') return 'reversed';
+  return 'pending';
+}
+
 export class SandboxPaymentAdapter implements PaymentAdapter {
+  async initiate(request: PaymentRequest) { return { reference: `sandbox-${request.contributionId}-${Date.now()}`, status: 'successful' as const }; }
+}
+
+export class MoneyUnifyPaymentAdapter implements PaymentAdapter {
+  private readonly muid = process.env.MONEYUNIFY_MUID;
   async initiate(request: PaymentRequest) {
-    return { reference: `sandbox-${request.contributionId}-${Date.now()}`, status: 'successful' as const };
+    if (!this.muid) throw new Error('MoneyUnify is not configured. Add MONEYUNIFY_MUID to the server environment.');
+    const phone = normalizeZambianPhone(request.phone).replace('+', '');
+    const response = await MoneyUnify.requestPayment(this.muid, phone, request.amount);
+    const reference = extractReference(response);
+    if (!reference) throw new Error('MoneyUnify did not return a transaction reference.');
+    return { reference, status: extractStatus(response) };
+  }
+  async verify(reference: string) {
+    if (!this.muid) throw new Error('MoneyUnify is not configured.');
+    const response = await MoneyUnify.verifyTransaction(this.muid, reference);
+    return { reference, status: extractStatus(response) };
   }
 }
 
 export function getPaymentAdapter(provider: PaymentProvider): PaymentAdapter {
   if (provider === 'sandbox') return new SandboxPaymentAdapter();
-  throw new Error(`${provider.toUpperCase()} mobile-money integration is not configured yet.`);
+  if (provider === 'moneyunify') return new MoneyUnifyPaymentAdapter();
+  throw new Error('Unsupported payment provider.');
 }
